@@ -6,6 +6,7 @@
  */
 
 import { parseEther, parseAbi, isAddress, encodeFunctionData, formatEther } from 'viem';
+import { printUpdateNag } from './check-update.js';
 import { getWalletClient, exists } from './lib/wallet.js';
 import { createPublicClientWithRetry } from './lib/rpc.js';
 import { getChain, getExplorerTxUrl } from './lib/chains.js';
@@ -384,6 +385,6 @@ Proceed with transaction?`;
   }
 }
 
-main().catch(error => {
+main().then(() => printUpdateNag()).catch(error => {
   exitWithError(`Unexpected error: ${error.message}`);
 });

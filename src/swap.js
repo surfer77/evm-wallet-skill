@@ -8,6 +8,7 @@
  */
 
 import { parseEther, parseUnits, formatEther, formatUnits, parseAbi, isAddress } from 'viem';
+import { printUpdateNag } from './check-update.js';
 import { getWalletClient, getAddress, exists } from './lib/wallet.js';
 import { createPublicClientWithRetry } from './lib/rpc.js';
 import { getChain, getExplorerTxUrl, getSupportedChains } from './lib/chains.js';
@@ -442,6 +443,6 @@ async function main() {
   }
 }
 
-main().catch(error => {
+main().then(() => printUpdateNag()).catch(error => {
   exitWithError(`Unexpected error: ${error.message}`);
 });
