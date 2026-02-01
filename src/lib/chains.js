@@ -106,9 +106,11 @@ export const chains = {
       url: "https://mega.etherscan.io"
     },
     rpcs: [
-      "https://mainnet.megaeth.com/rpc"
+      "https://mainnet.megaeth.com/rpc",
+      "https://rpc-megaeth-mainnet.globalstake.io"
     ],
     // MegaETH supports realtime_sendRawTransaction for instant receipts (<10ms finality)
+    // See: https://docs.megaeth.com/realtime-api
     realtimeRpc: "realtime_sendRawTransaction"
   }
 };
