@@ -109,9 +109,10 @@ export const chains = {
       "https://mainnet.megaeth.com/rpc",
       "https://rpc-megaeth-mainnet.globalstake.io"
     ],
-    // MegaETH supports realtime_sendRawTransaction for instant receipts (<10ms finality)
+    // MegaETH supports eth_sendRawTransactionSync (EIP-7966) for instant receipts (<10ms finality)
     // See: https://docs.megaeth.com/realtime-api
-    realtimeRpc: "realtime_sendRawTransaction"
+    // EIP-7966: https://ethereum-magicians.org/t/eip-7966-eth-sendrawtransactionsync-method/24640
+    syncRpc: "eth_sendRawTransactionSync"
   }
 };
 
