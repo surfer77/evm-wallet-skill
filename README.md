@@ -62,6 +62,7 @@ All commands support `--json` for machine-readable output.
 | Polygon | POL | 137 | [polygonscan.com](https://polygonscan.com) |
 | Arbitrum | ETH | 42161 | [arbiscan.io](https://arbiscan.io) |
 | Optimism | ETH | 10 | [optimistic.etherscan.io](https://optimistic.etherscan.io) |
+| MegaETH | ETH | 6343 | [megaeth-testnet-v2.blockscout.com](https://megaeth-testnet-v2.blockscout.com) |
 
 ## Architecture
 
