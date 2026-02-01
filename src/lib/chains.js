@@ -102,8 +102,8 @@ export const chains = {
       decimals: 18
     },
     explorer: {
-      name: "MegaETH Blockscout",
-      url: "https://megaeth.blockscout.com"
+      name: "Etherscan",
+      url: "https://mega.etherscan.io"
     },
     rpcs: [
       "https://mainnet.megaeth.com/rpc"
