@@ -130,7 +130,10 @@ export const chains = {
       "https://replicator.phoenix.lightlink.io/rpc/v1",
       "https://1890.rpc.thirdweb.com",
       "https://endpoints.omniatech.io/v1/lightlink/phoenix/public"
-    ]
+    ],
+    // LightLink uses legacy gas pricing (not EIP-1559)
+    // Supports gasless transactions (gasPrice = 0)
+    legacyGas: true
   }
 };
 

@@ -1,24 +1,59 @@
 /**
- * Smart EIP-1559 Gas Estimation
- * Calculates optimal gas parameters for transactions
+ * Smart Gas Estimation
+ * Supports both EIP-1559 and legacy gas pricing
  */
 
 import { createPublicClientWithRetry } from './rpc.js';
+import { getChain } from './chains.js';
 
 /**
- * Get smart gas estimation for EIP-1559 transaction
+ * Check if chain uses legacy gas pricing (non-EIP-1559)
+ * @param {string} chainName - Chain name
+ * @returns {boolean} True if chain uses legacy gas
+ */
+export function isLegacyGasChain(chainName) {
+  try {
+    const chain = getChain(chainName);
+    return chain.legacyGas === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get smart gas estimation for transaction
+ * Automatically detects chain type (EIP-1559 vs legacy)
  * @param {string} chainName - Chain name
  * @param {Object} [options] - Gas estimation options
  * @param {number} [options.safetyMargin] - Safety margin multiplier (default: 2)
  * @param {number} [options.priorityFeePercentile] - Priority fee percentile from recent blocks (default: 75)
- * @returns {Object} Gas parameters
+ * @param {bigint} [options.gasPrice] - Override gas price for legacy chains (optional)
+ * @returns {Object} Gas parameters with `type` field ('eip1559' or 'legacy')
  */
 export async function estimateGas(chainName, options = {}) {
   const {
     safetyMargin = 2,
-    priorityFeePercentile = 75
+    priorityFeePercentile = 75,
+    gasPrice: gasPriceOverride
   } = options;
   
+  // Check if this chain uses legacy gas pricing
+  if (isLegacyGasChain(chainName)) {
+    return estimateLegacyGas(chainName, { gasPrice: gasPriceOverride });
+  }
+  
+  // Use EIP-1559 estimation
+  return estimateEIP1559Gas(chainName, { safetyMargin, priorityFeePercentile });
+}
+
+/**
+ * Estimate gas using EIP-1559 (modern chains)
+ * @param {string} chainName - Chain name
+ * @param {Object} options - Estimation options
+ * @returns {Object} EIP-1559 gas parameters with type 'eip1559'
+ */
+async function estimateEIP1559Gas(chainName, options) {
+  const { safetyMargin, priorityFeePercentile } = options;
   const client = createPublicClientWithRetry(chainName);
   
   try {
@@ -27,7 +62,8 @@ export async function estimateGas(chainName, options = {}) {
     const baseFeePerGas = latestBlock.baseFeePerGas;
     
     if (!baseFeePerGas) {
-      throw new Error('Chain does not support EIP-1559 (no base fee found)');
+      // Chain doesn't support EIP-1559, fall back to legacy
+      return estimateLegacyGas(chainName, {});
     }
     
     // Estimate priority fee from recent blocks
@@ -41,16 +77,57 @@ export async function estimateGas(chainName, options = {}) {
     const maxFeePerGas = baseFeePerGas * BigInt(safetyMargin) + maxPriorityFeePerGas;
     
     return {
+      type: 'eip1559',
       maxFeePerGas,
       maxPriorityFeePerGas,
       baseFeePerGas,
-      gasPrice: maxFeePerGas, // For legacy compatibility
+      gasPrice: maxFeePerGas, // For backward compatibility
       estimatedCostGwei: formatGwei(maxFeePerGas),
       baseFeeGwei: formatGwei(baseFeePerGas),
       priorityFeeGwei: formatGwei(maxPriorityFeePerGas)
     };
   } catch (error) {
-    throw new Error(`Failed to estimate gas: ${error.message}`);
+    // If EIP-1559 estimation fails, try legacy as fallback
+    try {
+      return estimateLegacyGas(chainName, {});
+    } catch {
+      throw new Error(`Failed to estimate gas: ${error.message}`);
+    }
+  }
+}
+
+/**
+ * Estimate gas using legacy pricing (pre-EIP-1559 chains)
+ * @param {string} chainName - Chain name
+ * @param {Object} options - Estimation options
+ * @param {bigint} [options.gasPrice] - Override gas price (optional)
+ * @returns {Object} Legacy gas parameters with type 'legacy'
+ */
+async function estimateLegacyGas(chainName, options) {
+  const { gasPrice: gasPriceOverride } = options;
+  const client = createPublicClientWithRetry(chainName);
+  
+  try {
+    let gasPrice;
+    
+    if (gasPriceOverride !== undefined) {
+      // Use provided gas price override
+      gasPrice = gasPriceOverride;
+    } else {
+      // Get gas price from RPC
+      gasPrice = await client.getGasPrice();
+    }
+    
+    return {
+      type: 'legacy',
+      gasPrice,
+      // For backward compatibility
+      maxFeePerGas: gasPrice,
+      maxPriorityFeePerGas: BigInt(0),
+      estimatedCostGwei: formatGwei(gasPrice)
+    };
+  } catch (error) {
+    throw new Error(`Failed to estimate legacy gas: ${error.message}`);
   }
 }
 
@@ -183,4 +260,23 @@ export async function getCurrentGasPrices(chainNames = null) {
   );
   
   return results;
+}
+
+/**
+ * Build gas parameters for transaction based on gas type
+ * @param {Object} gasEstimate - Gas estimate from estimateGas()
+ * @returns {Object} Transaction gas parameters
+ */
+export function buildGasParams(gasEstimate) {
+  if (gasEstimate.type === 'legacy') {
+    return {
+      gasPrice: gasEstimate.gasPrice
+    };
+  }
+  
+  // EIP-1559
+  return {
+    maxFeePerGas: gasEstimate.maxFeePerGas,
+    maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas
+  };
 }

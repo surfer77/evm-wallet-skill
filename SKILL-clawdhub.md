@@ -74,6 +74,9 @@ node src/transfer.js <chain> <to_address> <amount> --yes --json
 
 # ERC20 token
 node src/transfer.js <chain> <to_address> <amount> <token_address> --yes --json
+
+# With custom gas price (for legacy chains)
+node src/transfer.js <chain> <to_address> <amount> --gas-price 0 --yes --json
 ```
 
 **⚠️ ALWAYS confirm with the user before executing transfers.** Show them:
@@ -83,6 +86,11 @@ node src/transfer.js <chain> <to_address> <amount> <token_address> --yes --json
 - Estimated gas cost
 
 Only add `--yes` after the user explicitly confirms.
+
+**Gas Price Options:**
+- Most chains use EIP-1559 gas pricing automatically
+- Legacy chains (like LightLink) use legacy gas pricing automatically
+- Use `--gas-price <gwei>` to override (e.g., `--gas-price 0` for gasless transactions on LightLink)
 
 ### Swap Tokens
 
@@ -114,6 +122,10 @@ node src/contract.js <chain> <contract_address> \
 # Write (costs gas — confirm first)
 node src/contract.js <chain> <contract_address> \
   "<function_signature>" [args...] --yes --json
+
+# Write with custom gas price (e.g., gasless on LightLink)
+node src/contract.js <chain> <contract_address> \
+  "<function_signature>" [args...] --gas-price 0 --yes --json
 ```
 
 Examples:
@@ -142,17 +154,28 @@ cd "$SKILL_DIR" && git pull && npm install
 
 ## Supported Chains
 
-| Chain | Native Token | Use For |
-|-------|-------------|---------|
-| base | ETH | Cheapest fees — default for testing |
-| ethereum | ETH | Mainnet, highest fees |
-| polygon | POL | Low fees |
-| arbitrum | ETH | Low fees |
-| optimism | ETH | Low fees |
-| megaeth | ETH | Ultra-fast transactions |
-| lightlink | ETH | Enterprise L2, low fees |
+| Chain | Native Token | Gas Type | Use For |
+|-------|-------------|----------|---------|
+| base | ETH | EIP-1559 | Cheapest fees — default for testing |
+| ethereum | ETH | EIP-1559 | Mainnet, highest fees |
+| polygon | POL | EIP-1559 | Low fees |
+| arbitrum | ETH | EIP-1559 | Low fees |
+| optimism | ETH | EIP-1559 | Low fees |
+| megaeth | ETH | EIP-1559 | Ultra-fast transactions |
+| lightlink | ETH | Legacy | Enterprise L2, supports gasless txs |
 
 **Always recommend Base** for first-time users (lowest gas fees).
+
+### LightLink Notes
+
+LightLink uses **legacy gas pricing** (not EIP-1559). The skill automatically detects this and uses the correct gas format.
+
+LightLink also supports **gasless transactions** — set `--gas-price 0` for zero-fee transfers:
+
+```bash
+# Gasless transfer on LightLink
+node src/transfer.js lightlink 0xRECIPIENT 0.01 --gas-price 0 --yes --json
+```
 
 ## Common Token Addresses
 
@@ -163,6 +186,36 @@ cd "$SKILL_DIR" && git pull && npm install
 ### Ethereum
 - **USDC:** `0xA0b86a33E6441b8a46a59DE4c4C5E8F5a6a7A8d0`
 - **WETH:** `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
+
+### LightLink
+- **USDC:** `0x5bE26527c30aB557B82375c4Df8b8EEd898Ccef1`
+- **USDT:** `0x603611F9a92D0Ca57E91026879d040D5d1aFe9Ce`
+
+## Gas Pricing
+
+The skill automatically handles gas pricing based on the chain:
+
+### EIP-1559 Chains (Base, Ethereum, Polygon, Arbitrum, Optimism, MegaETH)
+- Automatically estimates `maxFeePerGas` and `maxPriorityFeePerGas`
+- Uses 2x safety margin on base fee
+- Samples priority fees from recent blocks (75th percentile)
+- Adds 20% buffer to gas limit estimates
+
+### Legacy Chains (LightLink)
+- Uses `gasPrice` instead of EIP-1559 parameters
+- Fetches current gas price from RPC
+- Supports custom gas price overrides (including 0 for gasless)
+
+### Custom Gas Price
+Override gas price for any chain with `--gas-price <gwei>`:
+
+```bash
+# Fast transaction with high gas price
+node src/transfer.js base 0x... 0.01 --gas-price 50 --yes
+
+# Gasless transaction on LightLink
+node src/transfer.js lightlink 0x... 0.01 --gas-price 0 --yes
+```
 
 ## Safety Rules
 
@@ -179,4 +232,5 @@ cd "$SKILL_DIR" && git pull && npm install
 - **"Insufficient balance"** → Show current balance, suggest funding
 - **"RPC error"** → Retry once, automatic failover built in
 - **"No route found"** (swap) → Token pair may lack liquidity
-- **"Gas estimation failed"** → May need more ETH for gas
+- **"Gas estimation failed"** → May need more ETH for gas, or try `--gas-price` override
+- **"Chain does not support EIP-1559"** → The skill now auto-detects this, update your skill if you see this error
