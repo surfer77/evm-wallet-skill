@@ -1,6 +1,7 @@
 /**
  * EVM Chain Configurations
  * Includes chainId, native token, block explorers, and default public RPCs
+ * Updated to support all SODAX EVM chains
  */
 
 export const chains = {
@@ -52,7 +53,7 @@ export const chains = {
       url: "https://polygonscan.com"
     },
     rpcs: [
-      "https://polygon.llamarpc.com",
+      "https://polygon-rpc.com",
       "https://polygon.publicnode.com",
       "https://rpc.ankr.com/polygon"
     ]
@@ -109,9 +110,6 @@ export const chains = {
       "https://mainnet.megaeth.com/rpc",
       "https://rpc-megaeth-mainnet.globalstake.io"
     ],
-    // MegaETH supports eth_sendRawTransactionSync (EIP-7966) — returns tx receipt directly in response (<10ms)
-    // See: https://docs.megaeth.com/realtime-api
-    // EIP-7966: https://ethereum-magicians.org/t/eip-7966-eth-sendrawtransactionsync-method/24640
     syncRpc: "eth_sendRawTransactionSync"
   },
   
@@ -131,15 +129,86 @@ export const chains = {
       "https://1890.rpc.thirdweb.com",
       "https://endpoints.omniatech.io/v1/lightlink/phoenix/public"
     ],
-    // LightLink uses legacy gas pricing (not EIP-1559)
-    // Supports gasless transactions (gasPrice = 0)
     legacyGas: true
+  },
+
+  // === SODAX Additional Chains ===
+  
+  sonic: {
+    chainId: 146,
+    name: "Sonic",
+    nativeToken: {
+      symbol: "S",
+      decimals: 18
+    },
+    explorer: {
+      name: "Sonic Explorer",
+      url: "https://sonicscan.org"
+    },
+    rpcs: [
+      "https://rpc.soniclabs.com",
+      "https://sonic.drpc.org",
+      "https://rpc.ankr.com/sonic"
+    ]
+  },
+  
+  avalanche: {
+    chainId: 43114,
+    name: "Avalanche C-Chain",
+    nativeToken: {
+      symbol: "AVAX",
+      decimals: 18
+    },
+    explorer: {
+      name: "Snowtrace",
+      url: "https://snowtrace.io"
+    },
+    rpcs: [
+      "https://api.avax.network/ext/bc/C/rpc",
+      "https://avalanche.publicnode.com",
+      "https://rpc.ankr.com/avalanche"
+    ]
+  },
+  
+  bsc: {
+    chainId: 56,
+    name: "BNB Smart Chain",
+    nativeToken: {
+      symbol: "BNB",
+      decimals: 18
+    },
+    explorer: {
+      name: "BscScan",
+      url: "https://bscscan.com"
+    },
+    rpcs: [
+      "https://bsc-dataseed.binance.org",
+      "https://bsc.publicnode.com",
+      "https://rpc.ankr.com/bsc"
+    ]
+  },
+  
+  hyper: {
+    chainId: 998,
+    name: "HyperEVM",
+    nativeToken: {
+      symbol: "HYPE",
+      decimals: 18
+    },
+    explorer: {
+      name: "Hyperliquid Explorer",
+      url: "https://explorer.hyperliquid.xyz"
+    },
+    rpcs: [
+      "https://rpc.hyperliquid.xyz/evm",
+      "https://api.hyperliquid.xyz/evm"
+    ]
   }
 };
 
 /**
  * Get chain config by name
- * @param {string} chainName - Chain name (e.g., "base", "ethereum")
+ * @param {string} chainName - Chain name (e.g., "base", "ethereum", "sonic")
  * @returns {Object} Chain configuration
  */
 export function getChain(chainName) {
