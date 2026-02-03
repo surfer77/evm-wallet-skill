@@ -17,7 +17,7 @@ clawdhub install evm-wallet-skill
 Or clone directly:
 
 ```bash
-git clone https://github.com/amped-finance/evm-wallet-skill.git
+git clone https://github.com/surfer77/evm-wallet-skill.git
 cd evm-wallet-skill
 npm install
 ```
@@ -191,7 +191,3 @@ Example conversation:
 ## License
 
 MIT
-
----
-
-Maintained by [Amped Finance](https://amped.finance)

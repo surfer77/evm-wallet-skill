@@ -1,7 +1,7 @@
 ---
 name: evm-wallet-skill
 description: Self-sovereign EVM wallet for AI agents. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, or interact with smart contracts. Supports 11+ chains including Ethereum, Base, Arbitrum, Sonic, LightLink, and HyperEVM. Users can add custom chains. Private keys stored locally — no cloud custody, no API keys required.
-metadata: {"clawdbot":{"emoji":"💰","homepage":"https://github.com/amped-finance/evm-wallet-skill","requires":{"bins":["node","git"]}}}
+metadata: {"clawdbot":{"emoji":"💰","homepage":"https://github.com/surfer77/evm-wallet-skill","requires":{"bins":["node","git"]}}}
 ---
 
 # EVM Wallet Skill
@@ -24,7 +24,7 @@ SKILL_DIR=$(ls -d \
 If code is not installed yet (no `src/` folder), bootstrap it:
 ```bash
 if [ ! -d "$SKILL_DIR/src" ]; then
-  git clone https://github.com/amped-finance/evm-wallet-skill.git /tmp/evm-wallet-tmp
+  git clone https://github.com/surfer77/evm-wallet-skill.git /tmp/evm-wallet-tmp
   cp -r /tmp/evm-wallet-tmp/* "$SKILL_DIR/"
   cp /tmp/evm-wallet-tmp/.gitignore "$SKILL_DIR/" 2>/dev/null
   rm -rf /tmp/evm-wallet-tmp
