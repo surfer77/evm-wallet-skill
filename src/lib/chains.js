@@ -1,9 +1,18 @@
 /**
  * EVM Chain Configurations
  * Includes chainId, native token, block explorers, and default public RPCs
+ * 
+ * Supports user-defined chains via ~/.evm-wallet-chains.json
  */
 
-export const chains = {
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+
+/**
+ * Built-in chain configurations
+ */
+const builtInChains = {
   ethereum: {
     chainId: 1,
     name: "Ethereum",
@@ -52,9 +61,9 @@ export const chains = {
       url: "https://polygonscan.com"
     },
     rpcs: [
-      "https://polygon.llamarpc.com",
-      "https://polygon.publicnode.com",
-      "https://rpc.ankr.com/polygon"
+      "https://polygon-bor-rpc.publicnode.com",
+      "https://polygon.drpc.org",
+      "https://1rpc.io/matic"
     ]
   },
   
@@ -109,22 +118,159 @@ export const chains = {
       "https://mainnet.megaeth.com/rpc",
       "https://rpc-megaeth-mainnet.globalstake.io"
     ],
-    // MegaETH supports eth_sendRawTransactionSync (EIP-7966) — returns tx receipt directly in response (<10ms)
-    // See: https://docs.megaeth.com/realtime-api
-    // EIP-7966: https://ethereum-magicians.org/t/eip-7966-eth-sendrawtransactionsync-method/24640
     syncRpc: "eth_sendRawTransactionSync"
+  },
+
+  // === Additional SODAX/DeFi Chains ===
+  
+  sonic: {
+    chainId: 146,
+    name: "Sonic",
+    nativeToken: {
+      symbol: "S",
+      decimals: 18
+    },
+    explorer: {
+      name: "Sonic Explorer",
+      url: "https://sonicscan.org"
+    },
+    rpcs: [
+      "https://rpc.soniclabs.com",
+      "https://sonic.drpc.org",
+      "https://rpc.ankr.com/sonic"
+    ]
+  },
+  
+  lightlink: {
+    chainId: 1890,
+    name: "LightLink",
+    nativeToken: {
+      symbol: "ETH",
+      decimals: 18
+    },
+    explorer: {
+      name: "LightLink Explorer",
+      url: "https://phoenix.lightlink.io"
+    },
+    rpcs: [
+      "https://replicator.phoenix.lightlink.io/rpc/v1",
+      "https://1890.rpc.thirdweb.com"
+    ],
+    legacyGas: true  // LightLink requires legacy gas pricing
+  },
+  
+  hyper: {
+    chainId: 998,
+    name: "HyperEVM",
+    nativeToken: {
+      symbol: "HYPE",
+      decimals: 18
+    },
+    explorer: {
+      name: "Hyperliquid Explorer",
+      url: "https://explorer.hyperliquid.xyz"
+    },
+    rpcs: [
+      "https://rpc.hyperliquid.xyz/evm",
+      "https://api.hyperliquid.xyz/evm"
+    ]
+  },
+  
+  avalanche: {
+    chainId: 43114,
+    name: "Avalanche C-Chain",
+    nativeToken: {
+      symbol: "AVAX",
+      decimals: 18
+    },
+    explorer: {
+      name: "Snowtrace",
+      url: "https://snowtrace.io"
+    },
+    rpcs: [
+      "https://api.avax.network/ext/bc/C/rpc",
+      "https://avalanche.publicnode.com",
+      "https://rpc.ankr.com/avalanche"
+    ]
+  },
+  
+  bsc: {
+    chainId: 56,
+    name: "BNB Smart Chain",
+    nativeToken: {
+      symbol: "BNB",
+      decimals: 18
+    },
+    explorer: {
+      name: "BscScan",
+      url: "https://bscscan.com"
+    },
+    rpcs: [
+      "https://bsc-dataseed.binance.org",
+      "https://bsc.publicnode.com",
+      "https://rpc.ankr.com/bsc"
+    ]
+  },
+  
+  kaia: {
+    chainId: 8217,
+    name: "Kaia",
+    nativeToken: {
+      symbol: "KAIA",
+      decimals: 18
+    },
+    explorer: {
+      name: "KaiaScan",
+      url: "https://kaiascan.io"
+    },
+    rpcs: [
+      "https://public-en.node.kaia.io",
+      "https://kaia.blockpi.network/v1/rpc/public",
+      "https://rpc.ankr.com/kaia"
+    ]
   }
 };
 
 /**
+ * Path to user-defined chains config
+ */
+const USER_CHAINS_PATH = join(homedir(), '.evm-wallet-chains.json');
+
+/**
+ * Load user-defined chains from config file
+ * @returns {Object} User chain configurations
+ */
+function loadUserChains() {
+  if (!existsSync(USER_CHAINS_PATH)) {
+    return {};
+  }
+  
+  try {
+    const content = readFileSync(USER_CHAINS_PATH, 'utf-8');
+    const userChains = JSON.parse(content);
+    console.log(`[chains] Loaded ${Object.keys(userChains).length} user-defined chain(s)`);
+    return userChains;
+  } catch (error) {
+    console.warn(`[chains] Failed to load user chains from ${USER_CHAINS_PATH}:`, error.message);
+    return {};
+  }
+}
+
+/**
+ * Merged chains: built-in + user-defined (user chains override built-in)
+ */
+export const chains = { ...builtInChains, ...loadUserChains() };
+
+/**
  * Get chain config by name
- * @param {string} chainName - Chain name (e.g., "base", "ethereum")
+ * @param {string} chainName - Chain name (e.g., "base", "ethereum", "sonic")
  * @returns {Object} Chain configuration
  */
 export function getChain(chainName) {
   const chain = chains[chainName.toLowerCase()];
   if (!chain) {
-    throw new Error(`Unsupported chain: ${chainName}. Supported chains: ${Object.keys(chains).join(', ')}`);
+    const available = Object.keys(chains).join(', ');
+    throw new Error(`Unsupported chain: ${chainName}. Available chains: ${available}`);
   }
   return chain;
 }
@@ -138,6 +284,16 @@ export function getSupportedChains() {
 }
 
 /**
+ * Check if a chain uses legacy gas pricing
+ * @param {string} chainName - Chain name
+ * @returns {boolean} True if chain uses legacy gas
+ */
+export function isLegacyGasChain(chainName) {
+  const chain = getChain(chainName);
+  return chain.legacyGas === true;
+}
+
+/**
  * Create explorer URL for transaction
  * @param {string} chainName - Chain name
  * @param {string} txHash - Transaction hash
@@ -145,6 +301,7 @@ export function getSupportedChains() {
  */
 export function getExplorerTxUrl(chainName, txHash) {
   const chain = getChain(chainName);
+  if (!chain.explorer?.url) return null;
   return `${chain.explorer.url}/tx/${txHash}`;
 }
 
@@ -156,5 +313,14 @@ export function getExplorerTxUrl(chainName, txHash) {
  */
 export function getExplorerAddressUrl(chainName, address) {
   const chain = getChain(chainName);
+  if (!chain.explorer?.url) return null;
   return `${chain.explorer.url}/address/${address}`;
+}
+
+/**
+ * Get the path to user chains config file
+ * @returns {string} Path to ~/.evm-wallet-chains.json
+ */
+export function getUserChainsPath() {
+  return USER_CHAINS_PATH;
 }

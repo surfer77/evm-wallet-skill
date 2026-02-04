@@ -1,6 +1,6 @@
 ---
 name: evm-wallet-skill
-description: Self-sovereign EVM wallet for AI agents. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, or interact with smart contracts. Supports Base, Ethereum, Polygon, Arbitrum, and Optimism. Private keys stored locally — no cloud custody, no API keys required.
+description: Self-sovereign EVM wallet for AI agents. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, or interact with smart contracts. Supports 11+ chains including Ethereum, Base, Arbitrum, Sonic, LightLink, and HyperEVM. Users can add custom chains. Private keys stored locally — no cloud custody, no API keys required.
 metadata: {"clawdbot":{"emoji":"💰","homepage":"https://github.com/surfer77/evm-wallet-skill","requires":{"bins":["node","git"]}}}
 ---
 
@@ -87,6 +87,9 @@ node src/transfer.js <chain> <to_address> <amount> --yes --json
 
 # ERC20 token
 node src/transfer.js <chain> <to_address> <amount> <token_address> --yes --json
+
+# With custom gas price (for legacy chains)
+node src/transfer.js <chain> <to_address> <amount> --gas-price 0 --yes --json
 ```
 
 **⚠️ ALWAYS confirm with the user before executing transfers.** Show them:
@@ -96,6 +99,11 @@ node src/transfer.js <chain> <to_address> <amount> <token_address> --yes --json
 - Estimated gas cost
 
 Only add `--yes` after the user explicitly confirms.
+
+**Gas Price Options:**
+- Most chains use EIP-1559 gas pricing automatically
+- Legacy chains (like LightLink) use legacy gas pricing automatically
+- Use `--gas-price <gwei>` to override (e.g., `--gas-price 0` for gasless transactions on LightLink)
 
 ### Swap Tokens
 
@@ -127,6 +135,10 @@ node src/contract.js <chain> <contract_address> \
 # Write (costs gas — confirm first)
 node src/contract.js <chain> <contract_address> \
   "<function_signature>" [args...] --yes --json
+
+# Write with custom gas price (e.g., gasless on LightLink)
+node src/contract.js <chain> <contract_address> \
+  "<function_signature>" [args...] --gas-price 0 --yes --json
 ```
 
 Examples:
@@ -142,6 +154,46 @@ node src/contract.js base \
   "approve(address,uint256)" 0xSPENDER 1000000 --yes --json
 ```
 
+### List Chains
+
+Show all available chains (built-in + user-defined):
+
+```bash
+node src/list-chains.js --json
+```
+
+### Add Custom Chain
+
+When user wants to add a new blockchain:
+
+```bash
+node src/add-chain.js <name> <chainId> <rpc> [options] --json
+
+# Options:
+#   --native-token <symbol>  Native token symbol (default: ETH)
+#   --explorer <url>         Block explorer URL
+#   --legacy-gas             Use legacy gas pricing (for non EIP-1559 chains)
+```
+
+Examples:
+```bash
+# Add Berachain
+node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA --explorer https://berascan.io --json
+
+# Add a chain with legacy gas (like LightLink)
+node src/add-chain.js mychain 12345 https://rpc.mychain.io --legacy-gas --json
+```
+
+Custom chains are stored in `~/.evm-wallet-chains.json`.
+
+### Remove Custom Chain
+
+```bash
+node src/remove-chain.js <name> --yes --json
+```
+
+Note: Only user-defined chains can be removed. Built-in chains cannot be removed.
+
 ### Check for Updates
 
 ```bash
@@ -155,15 +207,42 @@ cd "$SKILL_DIR" && git pull && npm install
 
 ## Supported Chains
 
-| Chain | Native Token | Use For |
-|-------|-------------|---------|
-| base | ETH | Cheapest fees — default for testing |
-| ethereum | ETH | Mainnet, highest fees |
-| polygon | POL | Low fees |
-| arbitrum | ETH | Low fees |
-| optimism | ETH | Low fees |
+### Built-in Chains
 
-**Always recommend Base** for first-time users (lowest gas fees).
+| Chain | Native Token | Chain ID | Notes |
+|-------|-------------|----------|-------|
+| ethereum | ETH | 1 | Mainnet, highest fees |
+| base | ETH | 8453 | Cheapest fees — default for testing |
+| arbitrum | ETH | 42161 | Low fees |
+| optimism | ETH | 10 | Low fees |
+| polygon | POL | 137 | Low fees |
+| sonic | S | 146 | Sonic chain |
+| avalanche | AVAX | 43114 | Avalanche C-Chain |
+| bsc | BNB | 56 | BNB Smart Chain |
+| lightlink | ETH | 1890 | Legacy gas, supports gasless txs |
+| hyper | HYPE | 998 | HyperEVM |
+| megaeth | ETH | 4326 | MegaETH |
+
+### Custom Chains
+
+Users can add any EVM chain. When a user asks:
+> "Add Berachain with chain ID 80094 and RPC https://rpc.berachain.com"
+
+Run:
+```bash
+node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA --json
+```
+
+### LightLink Notes
+
+LightLink uses **legacy gas pricing** (not EIP-1559). The skill automatically detects this and uses the correct gas format.
+
+LightLink also supports **gasless transactions** — set `--gas-price 0` for zero-fee transfers:
+
+```bash
+# Gasless transfer on LightLink
+node src/transfer.js lightlink 0xRECIPIENT 0.01 --gas-price 0 --yes --json
+```
 
 ## Common Token Addresses
 
@@ -172,8 +251,34 @@ cd "$SKILL_DIR" && git pull && npm install
 - **WETH:** `0x4200000000000000000000000000000000000006`
 
 ### Ethereum
-- **USDC:** `0xA0b86a33E6441b8a46a59DE4c4C5E8F5a6a7A8d0`
+- **USDC:** `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`
 - **WETH:** `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
+
+## Gas Pricing
+
+The skill automatically handles gas pricing based on the chain:
+
+### EIP-1559 Chains (Base, Ethereum, Polygon, Arbitrum, Optimism, MegaETH)
+- Automatically estimates `maxFeePerGas` and `maxPriorityFeePerGas`
+- Uses 2x safety margin on base fee
+- Samples priority fees from recent blocks (75th percentile)
+- Adds 20% buffer to gas limit estimates
+
+### Legacy Chains (LightLink)
+- Uses `gasPrice` instead of EIP-1559 parameters
+- Fetches current gas price from RPC
+- Supports custom gas price overrides (including 0 for gasless)
+
+### Custom Gas Price
+Override gas price for any chain with `--gas-price <gwei>`:
+
+```bash
+# Fast transaction with high gas price
+node src/transfer.js base 0x... 0.01 --gas-price 50 --yes
+
+# Gasless transaction on LightLink
+node src/transfer.js lightlink 0x... 0.01 --gas-price 0 --yes
+```
 
 ## Safety Rules
 
@@ -191,3 +296,4 @@ cd "$SKILL_DIR" && git pull && npm install
 - **"RPC error"** → Retry once, automatic failover built in
 - **"No route found"** (swap) → Token pair may lack liquidity
 - **"Gas estimation failed"** → May need more ETH for gas
+- **"Unsupported chain"** → Use `node src/list-chains.js` to show available chains, or add it with `node src/add-chain.js`

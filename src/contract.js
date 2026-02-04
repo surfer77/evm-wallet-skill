@@ -10,7 +10,7 @@ import { printUpdateNag } from './check-update.js';
 import { getWalletClient, exists } from './lib/wallet.js';
 import { createPublicClientWithRetry } from './lib/rpc.js';
 import { getChain, getExplorerTxUrl } from './lib/chains.js';
-import { estimateGas, estimateGasLimit, formatGwei } from './lib/gas.js';
+import { estimateGas, estimateGasLimit, formatGwei, buildGasParams } from './lib/gas.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -26,6 +26,17 @@ if (valueIndex !== -1 && valueIndex < args.length - 1) {
   args.splice(valueIndex, 2); // Remove --value and its parameter
 }
 
+// Parse --gas-price flag
+let customGasPrice = null;
+const gasPriceIdx = args.indexOf('--gas-price');
+if (gasPriceIdx !== -1 && gasPriceIdx < args.length - 1) {
+  const gweiValue = parseFloat(args[gasPriceIdx + 1]);
+  if (!isNaN(gweiValue) && gweiValue >= 0) {
+    customGasPrice = BigInt(Math.floor(gweiValue * 1_000_000_000)); // Convert gwei to wei
+  }
+  args.splice(gasPriceIdx, 2); // Remove --gas-price and its parameter
+}
+
 function showHelp() {
   console.log(`
 EVM Contract Interaction
@@ -33,13 +44,14 @@ EVM Contract Interaction
 Usage: node src/contract.js [options] <chain> <address> <functionSig> [args...] [--value <eth>]
 
 Arguments:
-  chain          Chain name (base, ethereum, polygon, arbitrum, optimism)
+  chain          Chain name (base, ethereum, polygon, arbitrum, optimism, megaeth, lightlink)
   address        Contract address
   functionSig    Function signature (e.g., "balanceOf(address)" or "transfer(address,uint256)")
   args           Function arguments (space-separated)
 
 Options:
   --value <eth>  ETH value to send with transaction (for payable functions)
+  --gas-price    Custom gas price in gwei (for legacy chains, e.g., --gas-price 0 for gasless)
   --yes          Skip confirmation prompt (for write operations)
   --json         Output in JSON format
   --help         Show this help message
@@ -57,6 +69,9 @@ Examples:
   # Payable functions
   node src/contract.js ethereum 0x789... "deposit()" --value 0.1
   node src/contract.js base 0x456... "mint(address)" 0x123... --value 0.01 --yes
+  
+  # Gasless transactions (LightLink)
+  node src/contract.js lightlink 0x... "transfer(address,uint256)" 0x123... 1000 --gas-price 0 --yes
 `);
 }
 
@@ -194,7 +209,7 @@ async function main() {
     }
 
     // Parse arguments (exclude flags)
-    const filteredArgs = args.filter(arg => !arg.startsWith('--') && arg !== valueInEth);
+    const filteredArgs = args.filter(arg => !arg.startsWith('--'));
     const [chainName, contractAddress, functionSig, ...functionArgs] = filteredArgs;
     
     if (!chainName || !contractAddress || !functionSig) {
@@ -280,7 +295,12 @@ async function main() {
       // Estimate gas
       let gasEstimate;
       try {
-        gasEstimate = await estimateGas(chainName);
+        const gasOptions = {};
+        if (customGasPrice !== null) {
+          gasOptions.gasPrice = customGasPrice;
+        }
+        gasEstimate = await estimateGas(chainName, gasOptions);
+        
         const gasLimit = await estimateGasLimit(publicClient, {
           to: contractAddress,
           data: encodeFunctionData({
@@ -296,10 +316,21 @@ async function main() {
         exitWithError(`Gas estimation failed: ${error.message}`);
       }
       
-      const estimatedGasCost = gasEstimate.maxFeePerGas * gasEstimate.gasLimit;
+      // Calculate total cost
+      const gasPriceForCalc = gasEstimate.type === 'legacy' 
+        ? gasEstimate.gasPrice 
+        : gasEstimate.maxFeePerGas;
+      const estimatedGasCost = gasPriceForCalc * gasEstimate.gasLimit;
       const estimatedGasCostEth = formatEther(estimatedGasCost);
       
+      // Build gas params for transaction
+      const gasParams = buildGasParams(gasEstimate);
+      
       // Show confirmation details
+      const gasInfoText = gasEstimate.type === 'legacy'
+        ? `Gas Price: ${formatGwei(gasEstimate.gasPrice)} gwei (legacy)`
+        : `Max Fee: ${formatGwei(gasEstimate.maxFeePerGas)} gwei (EIP-1559)`;
+      
       const confirmationMessage = `
 🔧 Contract Call Details:
   Contract: ${contractAddress}
@@ -310,7 +341,7 @@ async function main() {
   
 ⛽ Gas Estimate:
   Gas Limit: ${gasEstimate.gasLimit.toLocaleString()}
-  Max Fee: ${formatGwei(gasEstimate.maxFeePerGas)} gwei
+  ${gasInfoText}
   Est. Cost: ${estimatedGasCostEth} ETH
   
 💰 Total Cost: ${(parseFloat(valueInEth) + parseFloat(estimatedGasCostEth)).toFixed(6)} ETH
@@ -340,9 +371,8 @@ Proceed with transaction?`;
           functionName: parsedFunction.functionName,
           args: parsedArgs,
           value,
-          maxFeePerGas: gasEstimate.maxFeePerGas,
-          maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas,
-          gas: gasEstimate.gasLimit
+          gas: gasEstimate.gasLimit,
+          ...gasParams
         });
       } catch (error) {
         exitWithError(`Transaction failed: ${error.message}`);
@@ -351,7 +381,7 @@ Proceed with transaction?`;
       const explorerUrl = getExplorerTxUrl(chainName, txHash);
       
       if (jsonFlag) {
-        console.log(JSON.stringify({
+        const result = {
           success: true,
           txHash,
           explorerUrl,
@@ -360,13 +390,21 @@ Proceed with transaction?`;
           args: functionArgs,
           value: valueInEth,
           chain: chainName,
+          gasType: gasEstimate.type,
           gasUsed: {
-            maxFeePerGas: gasEstimate.maxFeePerGas.toString(),
-            maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas.toString(),
             gasLimit: gasEstimate.gasLimit.toString(),
             estimatedCostEth: estimatedGasCostEth
           }
-        }, null, 2));
+        };
+        
+        if (gasEstimate.type === 'legacy') {
+          result.gasUsed.gasPrice = gasEstimate.gasPrice.toString();
+        } else {
+          result.gasUsed.maxFeePerGas = gasEstimate.maxFeePerGas.toString();
+          result.gasUsed.maxPriorityFeePerGas = gasEstimate.maxPriorityFeePerGas.toString();
+        }
+        
+        console.log(JSON.stringify(result, null, 2));
       } else {
         console.log('\n✅ Transaction successful!');
         console.log(`Tx Hash: ${txHash}`);

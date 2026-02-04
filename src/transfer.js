@@ -5,14 +5,15 @@
  * Usage: 
  *   node src/transfer.js <chain> <to> <amount>                  # Send native ETH
  *   node src/transfer.js <chain> <to> <amount> <tokenAddress>   # Send ERC20
+ *   node src/transfer.js <chain> <to> <amount> --gas-price 0    # Send with custom gas price
  */
 
-import { parseEther, parseUnits, formatEther, parseAbi, isAddress } from 'viem';
+import { parseEther, parseUnits, formatEther, parseAbi, isAddress, encodeFunctionData } from 'viem';
 import { printUpdateNag } from './check-update.js';
 import { getWalletClient, exists } from './lib/wallet.js';
 import { createPublicClientWithRetry } from './lib/rpc.js';
 import { getChain, getExplorerTxUrl } from './lib/chains.js';
-import { estimateGas, estimateGasLimit, formatGwei } from './lib/gas.js';
+import { estimateGas, estimateGasLimit, formatGwei, buildGasParams } from './lib/gas.js';
 
 // Standard ERC20 ABI
 const ERC20_ABI = parseAbi([
@@ -29,6 +30,16 @@ const jsonFlag = args.includes('--json');
 const yesFlag = args.includes('--yes') || args.includes('-y');
 const helpFlag = args.includes('--help') || args.includes('-h');
 
+// Parse --gas-price flag
+let customGasPrice = null;
+const gasPriceIdx = args.indexOf('--gas-price');
+if (gasPriceIdx !== -1 && args[gasPriceIdx + 1]) {
+  const gweiValue = parseFloat(args[gasPriceIdx + 1]);
+  if (!isNaN(gweiValue) && gweiValue >= 0) {
+    customGasPrice = BigInt(Math.floor(gweiValue * 1_000_000_000)); // Convert gwei to wei
+  }
+}
+
 function showHelp() {
   console.log(`
 EVM Wallet Transfer
@@ -36,7 +47,7 @@ EVM Wallet Transfer
 Usage: node src/transfer.js [options] <chain> <to> <amount> [tokenAddress]
 
 Arguments:
-  chain          Chain name (base, ethereum, polygon, arbitrum, optimism)
+  chain          Chain name (base, ethereum, polygon, arbitrum, optimism, megaeth, lightlink)
   to             Recipient address
   amount         Amount to send
   tokenAddress   ERC20 token contract address (optional, for token transfers)
@@ -44,12 +55,14 @@ Arguments:
 Options:
   --yes          Skip confirmation prompt
   --json         Output in JSON format
+  --gas-price    Custom gas price in gwei (for legacy chains, e.g., --gas-price 0 for gasless)
   --help         Show this help message
 
 Examples:
   node src/transfer.js base 0x123... 0.01                    # Send 0.01 ETH on Base
   node src/transfer.js base 0x123... 100 0x833589fcd...      # Send 100 USDC on Base
   node src/transfer.js ethereum 0x123... 0.5 --yes          # Send 0.5 ETH, skip confirmation
+  node src/transfer.js lightlink 0x123... 0.01 --gas-price 0  # Send with 0 gas price on LightLink
 `);
 }
 
@@ -139,8 +152,18 @@ async function main() {
     }
 
     // Parse arguments
-    const filteredArgs = args.filter(arg => !arg.startsWith('--'));
-    const [chainName, to, amount, tokenAddress] = filteredArgs;
+    const filteredArgs = args.filter(arg => !arg.startsWith('--') && !arg.match(/^\d+\.?\d*$/));
+    // Also need to filter out the gas price value
+    const positionalArgs = [];
+    for (let i = 0; i < args.length; i++) {
+      if (args[i].startsWith('--')) {
+        if (args[i] === '--gas-price') i++; // Skip the value too
+        continue;
+      }
+      positionalArgs.push(args[i]);
+    }
+    
+    const [chainName, to, amount, tokenAddress] = positionalArgs;
     
     if (!chainName || !to || !amount) {
       exitWithError('Missing required arguments. Use --help for usage information.');
@@ -199,36 +222,47 @@ async function main() {
     // Estimate gas
     let gasEstimate;
     try {
-      if (isNativeTransfer) {
-        gasEstimate = await estimateGas(chainName);
-        const gasLimit = await estimateGasLimit(publicClient, {
-          to,
-          value: transferAmount,
-          account: walletAddress
-        });
-        gasEstimate.gasLimit = gasLimit;
-      } else {
-        gasEstimate = await estimateGas(chainName);
-        const gasLimit = await estimateGasLimit(publicClient, {
-          to: tokenAddress,
-          data: walletClient.encodeFunctionData({
-            abi: ERC20_ABI,
-            functionName: 'transfer',
-            args: [to, transferAmount]
-          }),
-          account: walletAddress
-        });
-        gasEstimate.gasLimit = gasLimit;
+      const gasOptions = {};
+      if (customGasPrice !== null) {
+        gasOptions.gasPrice = customGasPrice;
       }
+      gasEstimate = await estimateGas(chainName, gasOptions);
+      
+      const gasLimitTx = isNativeTransfer ? {
+        to,
+        value: transferAmount,
+        account: walletAddress
+      } : {
+        to: tokenAddress,
+        data: encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [to, transferAmount]
+        }),
+        account: walletAddress
+      };
+      
+      const gasLimit = await estimateGasLimit(publicClient, gasLimitTx);
+      gasEstimate.gasLimit = gasLimit;
     } catch (error) {
       exitWithError(`Gas estimation failed: ${error.message}`);
     }
     
     // Calculate total cost for native transfers
-    const estimatedGasCost = gasEstimate.maxFeePerGas * gasEstimate.gasLimit;
+    const gasPriceForCalc = gasEstimate.type === 'legacy' 
+      ? gasEstimate.gasPrice 
+      : gasEstimate.maxFeePerGas;
+    const estimatedGasCost = gasPriceForCalc * gasEstimate.gasLimit;
     const estimatedGasCostEth = formatEther(estimatedGasCost);
     
+    // Build gas params for transaction
+    const gasParams = buildGasParams(gasEstimate);
+    
     // Show confirmation details
+    const gasInfoText = gasEstimate.type === 'legacy'
+      ? `Gas Price: ${formatGwei(gasEstimate.gasPrice)} gwei (legacy)`
+      : `Max Fee: ${formatGwei(gasEstimate.maxFeePerGas)} gwei (EIP-1559)`;
+    
     const confirmationMessage = `
 🚀 Transfer Details:
   From: ${walletAddress}
@@ -238,7 +272,7 @@ async function main() {
   
 ⛽ Gas Estimate:
   Gas Limit: ${gasEstimate.gasLimit.toLocaleString()}
-  Max Fee: ${formatGwei(gasEstimate.maxFeePerGas)} gwei
+  ${gasInfoText}
   Est. Cost: ${estimatedGasCostEth} ETH
   
 ${isNativeTransfer ? `💰 Total Deduction: ${(parseFloat(amount) + parseFloat(estimatedGasCostEth)).toFixed(6)} ETH` : `💰 Gas Cost: ${estimatedGasCostEth} ETH (separate from token transfer)`}
@@ -267,9 +301,8 @@ Proceed with transfer?`;
         txHash = await walletClient.sendTransaction({
           to,
           value: transferAmount,
-          maxFeePerGas: gasEstimate.maxFeePerGas,
-          maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas,
-          gas: gasEstimate.gasLimit
+          gas: gasEstimate.gasLimit,
+          ...gasParams
         });
       } else {
         // Send ERC20 token
@@ -278,9 +311,8 @@ Proceed with transfer?`;
           abi: ERC20_ABI,
           functionName: 'transfer',
           args: [to, transferAmount],
-          maxFeePerGas: gasEstimate.maxFeePerGas,
-          maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas,
-          gas: gasEstimate.gasLimit
+          gas: gasEstimate.gasLimit,
+          ...gasParams
         });
       }
     } catch (error) {
@@ -290,7 +322,7 @@ Proceed with transfer?`;
     const explorerUrl = getExplorerTxUrl(chainName, txHash);
     
     if (jsonFlag) {
-      console.log(JSON.stringify({
+      const result = {
         success: true,
         txHash,
         explorerUrl,
@@ -300,13 +332,21 @@ Proceed with transfer?`;
         symbol,
         chain: chainName,
         tokenAddress: tokenAddress || null,
+        gasType: gasEstimate.type,
         gasUsed: {
-          maxFeePerGas: gasEstimate.maxFeePerGas.toString(),
-          maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas.toString(),
           gasLimit: gasEstimate.gasLimit.toString(),
           estimatedCostEth: estimatedGasCostEth
         }
-      }, null, 2));
+      };
+      
+      if (gasEstimate.type === 'legacy') {
+        result.gasUsed.gasPrice = gasEstimate.gasPrice.toString();
+      } else {
+        result.gasUsed.maxFeePerGas = gasEstimate.maxFeePerGas.toString();
+        result.gasUsed.maxPriorityFeePerGas = gasEstimate.maxPriorityFeePerGas.toString();
+      }
+      
+      console.log(JSON.stringify(result, null, 2));
     } else {
       console.log('\n✅ Transfer successful!');
       console.log(`Tx Hash: ${txHash}`);
