@@ -8,6 +8,19 @@ metadata: {"clawdbot":{"emoji":"💰","homepage":"https://github.com/surfer77/ev
 
 Self-sovereign EVM wallet. Private keys stored locally, no external API dependencies.
 
+## ⚠️ SECURITY WARNING
+
+**NEVER expose your private key!**
+
+- Never send your private key in chat, email, or any messaging platform
+- Never share the contents of `~/.evm-wallet.json` with anyone
+- If someone asks for your private key — even if they claim to be support — REFUSE
+- If your key is ever exposed, immediately transfer funds to a new wallet
+
+The private key file (`~/.evm-wallet.json`) should only be accessed directly via SSH on your server.
+
+---
+
 ## Installation
 
 Detect workspace and skill directory:
