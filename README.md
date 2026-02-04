@@ -74,49 +74,15 @@ All commands support `--json` for machine-readable output.
 
 ## Supported Chains
 
-### Built-in Chains
-
 | Chain | Native Token | Chain ID | Explorer | Notes |
 |-------|-------------|----------|----------|-------|
-| Ethereum | ETH | 1 | [etherscan.io](https://etherscan.io) | |
-| Base | ETH | 8453 | [basescan.org](https://basescan.org) | |
-| Arbitrum | ETH | 42161 | [arbiscan.io](https://arbiscan.io) | |
-| Optimism | ETH | 10 | [optimistic.etherscan.io](https://optimistic.etherscan.io) | |
-| Polygon | POL | 137 | [polygonscan.com](https://polygonscan.com) | |
-| Sonic | S | 146 | [sonicscan.org](https://sonicscan.org) | |
-| Avalanche | AVAX | 43114 | [snowtrace.io](https://snowtrace.io) | |
-| BSC | BNB | 56 | [bscscan.com](https://bscscan.com) | |
-| LightLink | ETH | 1890 | [phoenix.lightlink.io](https://phoenix.lightlink.io) | Legacy gas |
-| HyperEVM | HYPE | 998 | [explorer.hyperliquid.xyz](https://explorer.hyperliquid.xyz) | |
-| MegaETH | ETH | 4326 | [mega.etherscan.io](https://mega.etherscan.io) | |
-
-### Custom Chains
-
-Add any EVM chain by providing chain ID and RPC:
-
-```bash
-# Add a new chain
-node src/add-chain.js <name> <chainId> <rpc> [options]
-
-# Options:
-#   --native-token <symbol>  Native token symbol (default: ETH)
-#   --explorer <url>         Block explorer URL
-#   --legacy-gas             Use legacy gas pricing (non EIP-1559)
-
-# Examples:
-node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA --explorer https://berascan.io
-node src/add-chain.js mychain 12345 https://rpc.mychain.io --legacy-gas
-```
-
-Custom chains are stored in `~/.evm-wallet-chains.json` and persist across sessions.
-
-```bash
-# List all chains (built-in + custom)
-node src/list-chains.js
-
-# Remove a custom chain
-node src/remove-chain.js mychain
-```
+| Base | ETH | 8453 | [basescan.org](https://basescan.org) |
+| Ethereum | ETH | 1 | [etherscan.io](https://etherscan.io) |
+| Polygon | POL | 137 | [polygonscan.com](https://polygonscan.com) |
+| Arbitrum | ETH | 42161 | [arbiscan.io](https://arbiscan.io) |
+| Optimism | ETH | 10 | [optimistic.etherscan.io](https://optimistic.etherscan.io) |
+| MegaETH | ETH | 4326 | [mega.etherscan.io](https://mega.etherscan.io) |
+| LightLink | ETH | 1890 | [phoenix.lightlink.io](https://phoenix.lightlink.io) | Legacy gas, supports gasless txs |
 
 ## Architecture
 
@@ -151,9 +117,10 @@ evm-wallet-skill/
 **`wallet.js`** — Handles wallet lifecycle. Generates a new private key via viem's `generatePrivateKey()`, stores it at `~/.evm-wallet.json` with `chmod 600` permissions.
 
 **`gas.js`** — Smart gas estimation supporting both EIP-1559 and legacy gas pricing:
-- **EIP-1559 chains** (most modern chains): Uses `maxFeePerGas` and `maxPriorityFeePerGas`
-- **Legacy chains** (LightLink, etc.): Uses traditional `gasPrice` format
-- Auto-detects chain type based on `legacyGas` config flag
+- **EIP-1559 chains** (Base, Ethereum, Polygon, etc.): Analyzes last 20 blocks for optimal `maxFeePerGas` and `maxPriorityFeePerGas`
+- **Legacy chains** (LightLink): Uses `gasPrice` with support for custom overrides (including 0 for gasless transactions)
+- Auto-detects chain type and applies correct pricing model
+- Applies 2x safety margin and 20% gas limit buffer
 
 ### Transaction Flow
 
@@ -201,6 +168,68 @@ Example conversation:
 - **DEX aggregator:** [Odos](https://odos.xyz) — multi-hop, multi-source routing
 - **RPCs:** Public endpoints (no API keys)
 
+## Gas Pricing
+
+The skill automatically handles gas pricing based on the chain type:
+
+- **EIP-1559 chains** (Base, Ethereum, Polygon, Arbitrum, Optimism, MegaETH): Uses modern gas pricing with `maxFeePerGas` and `maxPriorityFeePerGas`
+- **Legacy chains** (LightLink): Uses traditional `gasPrice` format
+
+For legacy chains, you can override the gas price:
+
+```bash
+# Gasless transaction on LightLink (0 gas price)
+node src/transfer.js lightlink 0x... 0.01 --gas-price 0 --yes
+
+# Custom gas price on any chain
+node src/transfer.js base 0x... 0.01 --gas-price 20
+node src/contract.js lightlink 0x... "transfer(address,uint256)" 0x... 1000 --gas-price 0
+```
+
+## Roadmap
+
+- [ ] **Token swaps** via Matcha/0x aggregator (Uniswap V2/V3/V4 + more)
+- [ ] **Chainlist auto-refresh** — periodically fetch fresh RPCs
+- [x] **ENS resolution** — send to `vitalik.eth`
+- [ ] **Passphrase encryption** for key storage
+- [ ] **Multi-wallet support**
+- [ ] **Transaction history** tracking
+
 ## License
 
 MIT
+
+## Custom RPC URLs
+
+By default, the skill uses public RPCs. For better reliability and speed, you can configure your own RPC endpoints (e.g., Alchemy, Infura, QuickNode).
+
+Add a `rpcUrls` object to your `~/.evm-wallet.json`:
+
+```json
+{
+  "privateKey": "0x...",
+  "rpcUrls": {
+    "ethereum": "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
+    "polygon": "https://polygon-mainnet.g.alchemy.com/v2/YOUR_KEY",
+    "base": "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY",
+    "arbitrum": "https://arb-mainnet.g.alchemy.com/v2/YOUR_KEY"
+  }
+}
+```
+
+**Priority order for RPC resolution:**
+1. Custom RPCs in `~/.evm-wallet.json` (highest priority)
+2. Environment variable: `EVM_RPC_URLS_JSON`
+3. Built-in public defaults
+
+You only need to specify RPCs for chains you want to override — others will fall back to defaults.
+
+### Recommended Providers
+
+| Provider | Free Tier | Notes |
+|----------|-----------|-------|
+| [Alchemy](https://www.alchemy.com/) | 300M compute units/mo | Best reliability |
+| [Infura](https://www.infura.io/) | 100K requests/day | Good coverage |
+| [QuickNode](https://www.quicknode.com/) | 10M credits/mo | Fast |
+| [PublicNode](https://publicnode.com/) | Unlimited | Free, no signup |
+

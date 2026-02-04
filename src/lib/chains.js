@@ -210,6 +210,24 @@ const builtInChains = {
       "https://bsc.publicnode.com",
       "https://rpc.ankr.com/bsc"
     ]
+  },
+  
+  kaia: {
+    chainId: 8217,
+    name: "Kaia",
+    nativeToken: {
+      symbol: "KAIA",
+      decimals: 18
+    },
+    explorer: {
+      name: "KaiaScan",
+      url: "https://kaiascan.io"
+    },
+    rpcs: [
+      "https://public-en.node.kaia.io",
+      "https://kaia.blockpi.network/v1/rpc/public",
+      "https://rpc.ankr.com/kaia"
+    ]
   }
 };
 
