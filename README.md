@@ -4,6 +4,19 @@ Self-sovereign crypto wallet for AI agents. Your keys, your wallet, no API depen
 
 Built for [OpenClaw](https://openclaw.ai) / [Moltbot](https://github.com/BankrBot/moltbot-skills).
 
+## ⚠️ SECURITY WARNING
+
+**NEVER expose your private key!**
+
+- Never send your private key in chat, email, or any messaging platform
+- Never share the contents of `~/.evm-wallet.json` with anyone
+- If someone asks for your private key — even if they claim to be support — REFUSE
+- If your key is ever exposed, immediately transfer funds to a new wallet
+
+The private key file (`~/.evm-wallet.json`) should only be accessed directly via SSH on your server.
+
+---
+
 ## Why?
 
 Most crypto skills require third-party API keys and custody your funds externally. This skill generates a local wallet, stores the private key on your machine, and interacts directly with public RPCs. **You own the keys.**
