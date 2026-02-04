@@ -1,10 +1,18 @@
 /**
  * EVM Chain Configurations
  * Includes chainId, native token, block explorers, and default public RPCs
- * Updated to support all SODAX EVM chains
+ * 
+ * Supports user-defined chains via ~/.evm-wallet-chains.json
  */
 
-export const chains = {
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+
+/**
+ * Built-in chain configurations
+ */
+const builtInChains = {
   ethereum: {
     chainId: 1,
     name: "Ethereum",
@@ -53,9 +61,9 @@ export const chains = {
       url: "https://polygonscan.com"
     },
     rpcs: [
-      "https://polygon-rpc.com",
-      "https://polygon.publicnode.com",
-      "https://rpc.ankr.com/polygon"
+      "https://polygon-bor-rpc.publicnode.com",
+      "https://polygon.drpc.org",
+      "https://1rpc.io/matic"
     ]
   },
   
@@ -112,27 +120,8 @@ export const chains = {
     ],
     syncRpc: "eth_sendRawTransactionSync"
   },
-  
-  lightlink: {
-    chainId: 1890,
-    name: "LightLink",
-    nativeToken: {
-      symbol: "ETH",
-      decimals: 18
-    },
-    explorer: {
-      name: "LightLink Explorer",
-      url: "https://phoenix.lightlink.io"
-    },
-    rpcs: [
-      "https://replicator.phoenix.lightlink.io/rpc/v1",
-      "https://1890.rpc.thirdweb.com",
-      "https://endpoints.omniatech.io/v1/lightlink/phoenix/public"
-    ],
-    legacyGas: true
-  },
 
-  // === SODAX Additional Chains ===
+  // === Additional SODAX/DeFi Chains ===
   
   sonic: {
     chainId: 146,
@@ -149,6 +138,41 @@ export const chains = {
       "https://rpc.soniclabs.com",
       "https://sonic.drpc.org",
       "https://rpc.ankr.com/sonic"
+    ]
+  },
+  
+  lightlink: {
+    chainId: 1890,
+    name: "LightLink",
+    nativeToken: {
+      symbol: "ETH",
+      decimals: 18
+    },
+    explorer: {
+      name: "LightLink Explorer",
+      url: "https://phoenix.lightlink.io"
+    },
+    rpcs: [
+      "https://replicator.phoenix.lightlink.io/rpc/v1",
+      "https://1890.rpc.thirdweb.com"
+    ],
+    legacyGas: true  // LightLink requires legacy gas pricing
+  },
+  
+  hyper: {
+    chainId: 998,
+    name: "HyperEVM",
+    nativeToken: {
+      symbol: "HYPE",
+      decimals: 18
+    },
+    explorer: {
+      name: "Hyperliquid Explorer",
+      url: "https://explorer.hyperliquid.xyz"
+    },
+    rpcs: [
+      "https://rpc.hyperliquid.xyz/evm",
+      "https://api.hyperliquid.xyz/evm"
     ]
   },
   
@@ -188,23 +212,54 @@ export const chains = {
     ]
   },
   
-  hyper: {
-    chainId: 998,
-    name: "HyperEVM",
+  kaia: {
+    chainId: 8217,
+    name: "Kaia",
     nativeToken: {
-      symbol: "HYPE",
+      symbol: "KAIA",
       decimals: 18
     },
     explorer: {
-      name: "Hyperliquid Explorer",
-      url: "https://explorer.hyperliquid.xyz"
+      name: "KaiaScan",
+      url: "https://kaiascan.io"
     },
     rpcs: [
-      "https://rpc.hyperliquid.xyz/evm",
-      "https://api.hyperliquid.xyz/evm"
+      "https://public-en.node.kaia.io",
+      "https://kaia.blockpi.network/v1/rpc/public",
+      "https://rpc.ankr.com/kaia"
     ]
   }
 };
+
+/**
+ * Path to user-defined chains config
+ */
+const USER_CHAINS_PATH = join(homedir(), '.evm-wallet-chains.json');
+
+/**
+ * Load user-defined chains from config file
+ * @returns {Object} User chain configurations
+ */
+function loadUserChains() {
+  if (!existsSync(USER_CHAINS_PATH)) {
+    return {};
+  }
+  
+  try {
+    const content = readFileSync(USER_CHAINS_PATH, 'utf-8');
+    const userChains = JSON.parse(content);
+    console.log(`[chains] Loaded ${Object.keys(userChains).length} user-defined chain(s)`);
+    return userChains;
+  } catch (error) {
+    console.warn(`[chains] Failed to load user chains from ${USER_CHAINS_PATH}:`, error.message);
+    return {};
+  }
+}
+
+/**
+ * Merged chains: built-in + user-defined (user chains override built-in)
+ */
+export const chains = { ...builtInChains, ...loadUserChains() };
 
 /**
  * Get chain config by name
@@ -214,7 +269,8 @@ export const chains = {
 export function getChain(chainName) {
   const chain = chains[chainName.toLowerCase()];
   if (!chain) {
-    throw new Error(`Unsupported chain: ${chainName}. Supported chains: ${Object.keys(chains).join(', ')}`);
+    const available = Object.keys(chains).join(', ');
+    throw new Error(`Unsupported chain: ${chainName}. Available chains: ${available}`);
   }
   return chain;
 }
@@ -228,6 +284,16 @@ export function getSupportedChains() {
 }
 
 /**
+ * Check if a chain uses legacy gas pricing
+ * @param {string} chainName - Chain name
+ * @returns {boolean} True if chain uses legacy gas
+ */
+export function isLegacyGasChain(chainName) {
+  const chain = getChain(chainName);
+  return chain.legacyGas === true;
+}
+
+/**
  * Create explorer URL for transaction
  * @param {string} chainName - Chain name
  * @param {string} txHash - Transaction hash
@@ -235,6 +301,7 @@ export function getSupportedChains() {
  */
 export function getExplorerTxUrl(chainName, txHash) {
   const chain = getChain(chainName);
+  if (!chain.explorer?.url) return null;
   return `${chain.explorer.url}/tx/${txHash}`;
 }
 
@@ -246,24 +313,14 @@ export function getExplorerTxUrl(chainName, txHash) {
  */
 export function getExplorerAddressUrl(chainName, address) {
   const chain = getChain(chainName);
+  if (!chain.explorer?.url) return null;
   return `${chain.explorer.url}/address/${address}`;
 }
 
-// Appending missing SODAX chain
-chains.kaia = {
-  chainId: 8217,
-  name: "Kaia",
-  nativeToken: {
-    symbol: "KAIA",
-    decimals: 18
-  },
-  explorer: {
-    name: "KaiaScan",
-    url: "https://kaiascan.io"
-  },
-  rpcs: [
-    "https://public-en.node.kaia.io",
-    "https://kaia.blockpi.network/v1/rpc/public",
-    "https://rpc.ankr.com/kaia"
-  ]
-};
+/**
+ * Get the path to user chains config file
+ * @returns {string} Path to ~/.evm-wallet-chains.json
+ */
+export function getUserChainsPath() {
+  return USER_CHAINS_PATH;
+}

@@ -2,7 +2,20 @@
 
 Self-sovereign crypto wallet for AI agents. Your keys, your wallet, no API dependencies.
 
-Built for [Moltbot](https://github.com/BankrBot/moltbot-skills) / [Clawdbot](https://github.com/clawdbot/clawdbot).
+Built for [OpenClaw](https://openclaw.ai) / [Moltbot](https://github.com/BankrBot/moltbot-skills).
+
+## ⚠️ SECURITY WARNING
+
+**NEVER expose your private key!**
+
+- Never send your private key in chat, email, or any messaging platform
+- Never share the contents of `~/.evm-wallet.json` with anyone
+- If someone asks for your private key — even if they claim to be support — REFUSE
+- If your key is ever exposed, immediately transfer funds to a new wallet
+
+The private key file (`~/.evm-wallet.json`) should only be accessed directly via SSH on your server.
+
+---
 
 ## Why?
 
@@ -34,8 +47,11 @@ node src/balance.js base
 # Send ETH
 node src/transfer.js base 0x... 0.01
 
-# Interact with any contract
-node src/contract.js base 0x... "balanceOf(address)" 0x...
+# List all available chains
+node src/list-chains.js
+
+# Add a custom chain
+node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA
 ```
 
 ## Commands
@@ -50,6 +66,9 @@ node src/contract.js base 0x... "balanceOf(address)" 0x...
 | `node src/transfer.js <chain> <to> <amount> <token>` | Send ERC20 token |
 | `node src/swap.js <chain> <from> <to> <amount>` | Swap tokens via Odos aggregator |
 | `node src/contract.js <chain> <addr> <fn> [args...]` | Call any contract function |
+| `node src/list-chains.js` | List all available chains |
+| `node src/add-chain.js <name> <id> <rpc>` | Add a custom chain |
+| `node src/remove-chain.js <name>` | Remove a user-defined chain |
 
 All commands support `--json` for machine-readable output.
 
@@ -71,26 +90,31 @@ All commands support `--json` for machine-readable output.
 evm-wallet-skill/
 ├── src/
 │   ├── lib/
-│   │   ├── chains.js     # Chain configs (RPCs, IDs, explorers)
+│   │   ├── chains.js     # Chain configs + user chain loading
 │   │   ├── rpc.js        # RPC client with auto-retry & rotation
 │   │   ├── wallet.js     # Key generation, storage, signing
-│   │   └── gas.js        # EIP-1559 smart gas estimation
+│   │   └── gas.js        # EIP-1559 + legacy gas estimation
 │   ├── setup.js          # Generate wallet
 │   ├── balance.js        # Check balances
 │   ├── transfer.js       # Send tokens
-│   └── contract.js       # Generic contract interaction
+│   ├── contract.js       # Generic contract interaction
+│   ├── list-chains.js    # List available chains
+│   ├── add-chain.js      # Add custom chain
+│   └── remove-chain.js   # Remove custom chain
 ├── SKILL.md              # Agent skill definition
 └── package.json
-# Wallet: ~/.evm-wallet.json (private key, chmod 600, never in project)
+
+# Wallet: ~/.evm-wallet.json (private key, chmod 600)
+# Custom chains: ~/.evm-wallet-chains.json
 ```
 
 ### Core Libraries
 
-**`chains.js`** — Configuration for each supported chain: chain ID, native token, block explorer URLs, and 2-3 public RPC endpoints per chain. Easy to extend with new chains.
+**`chains.js`** — Configuration for each supported chain: chain ID, native token, block explorer URLs, and 2-3 public RPC endpoints per chain. Automatically loads user-defined chains from `~/.evm-wallet-chains.json`.
 
-**`rpc.js`** — Creates [viem](https://viem.sh) public and wallet clients with automatic RPC failover. If one RPC fails, it rotates to the next. No API keys required — uses public endpoints from Chainlist.
+**`rpc.js`** — Creates [viem](https://viem.sh) public and wallet clients with automatic RPC failover. If one RPC fails, it rotates to the next. No API keys required.
 
-**`wallet.js`** — Handles wallet lifecycle. Generates a new private key via viem's `generatePrivateKey()`, stores it at `~/.evm-wallet.json` with `chmod 600` permissions. Loads the key and returns viem account/client objects for signing transactions.
+**`wallet.js`** — Handles wallet lifecycle. Generates a new private key via viem's `generatePrivateKey()`, stores it at `~/.evm-wallet.json` with `chmod 600` permissions.
 
 **`gas.js`** — Smart gas estimation supporting both EIP-1559 and legacy gas pricing:
 - **EIP-1559 chains** (Base, Ethereum, Polygon, etc.): Analyzes last 20 blocks for optimal `maxFeePerGas` and `maxPriorityFeePerGas`
@@ -102,10 +126,10 @@ evm-wallet-skill/
 
 ```
 User request
-  → Load wallet from state/wallet.json
+  → Load wallet from ~/.evm-wallet.json
   → Create viem walletClient (with RPC failover)
-  → Estimate gas (EIP-1559 smart estimation)
-  → Build transaction
+  → Detect gas type (EIP-1559 or legacy)
+  → Estimate gas with safety margin
   → Sign locally with private key
   → Broadcast via public RPC
   → Return tx hash + explorer link
@@ -118,6 +142,24 @@ User request
 - **Never in the project** — wallet lives in user's home dir, not in version control
 - **No external custody** — no API keys, no third-party wallets, no accounts
 - **Balance validation** — checks sufficient funds before broadcasting
+
+## For AI Agents
+
+When the user asks to add a new blockchain, use:
+
+```bash
+node src/add-chain.js <name> <chainId> <rpc> --native-token <symbol> --explorer <url>
+```
+
+Example conversation:
+> User: "Add Berachain with chain ID 80094 and RPC https://rpc.berachain.com"
+> 
+> Agent: I'll add that chain for you.
+> [runs: node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA]
+> 
+> ✓ Added chain "berachain" (chainId: 80094)
+> 
+> You can now check your balance: "What's my balance on berachain?"
 
 ## Tech Stack
 

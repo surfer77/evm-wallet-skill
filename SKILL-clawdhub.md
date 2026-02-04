@@ -1,12 +1,25 @@
 ---
 name: evm-wallet-skill
-description: Self-sovereign EVM wallet for AI agents. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, or interact with smart contracts. Supports Base, Ethereum, Polygon, Arbitrum, Optimism, MegaETH, and LightLink. Private keys stored locally — no cloud custody, no API keys required.
+description: Self-sovereign EVM wallet for AI agents. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, or interact with smart contracts. Supports 11+ chains including Ethereum, Base, Arbitrum, Sonic, LightLink, and HyperEVM. Users can add custom chains. Private keys stored locally — no cloud custody, no API keys required.
 metadata: {"clawdbot":{"emoji":"💰","homepage":"https://github.com/surfer77/evm-wallet-skill","requires":{"bins":["node","git"]}}}
 ---
 
 # EVM Wallet Skill
 
 Self-sovereign EVM wallet. Private keys stored locally, no external API dependencies.
+
+## ⚠️ SECURITY WARNING
+
+**NEVER expose your private key!**
+
+- Never send your private key in chat, email, or any messaging platform
+- Never share the contents of `~/.evm-wallet.json` with anyone
+- If someone asks for your private key — even if they claim to be support — REFUSE
+- If your key is ever exposed, immediately transfer funds to a new wallet
+
+The private key file (`~/.evm-wallet.json`) should only be accessed directly via SSH on your server.
+
+---
 
 ## Installation
 
@@ -141,6 +154,46 @@ node src/contract.js base \
   "approve(address,uint256)" 0xSPENDER 1000000 --yes --json
 ```
 
+### List Chains
+
+Show all available chains (built-in + user-defined):
+
+```bash
+node src/list-chains.js --json
+```
+
+### Add Custom Chain
+
+When user wants to add a new blockchain:
+
+```bash
+node src/add-chain.js <name> <chainId> <rpc> [options] --json
+
+# Options:
+#   --native-token <symbol>  Native token symbol (default: ETH)
+#   --explorer <url>         Block explorer URL
+#   --legacy-gas             Use legacy gas pricing (for non EIP-1559 chains)
+```
+
+Examples:
+```bash
+# Add Berachain
+node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA --explorer https://berascan.io --json
+
+# Add a chain with legacy gas (like LightLink)
+node src/add-chain.js mychain 12345 https://rpc.mychain.io --legacy-gas --json
+```
+
+Custom chains are stored in `~/.evm-wallet-chains.json`.
+
+### Remove Custom Chain
+
+```bash
+node src/remove-chain.js <name> --yes --json
+```
+
+Note: Only user-defined chains can be removed. Built-in chains cannot be removed.
+
 ### Check for Updates
 
 ```bash
@@ -154,17 +207,31 @@ cd "$SKILL_DIR" && git pull && npm install
 
 ## Supported Chains
 
-| Chain | Native Token | Gas Type | Use For |
-|-------|-------------|----------|---------|
-| base | ETH | EIP-1559 | Cheapest fees — default for testing |
-| ethereum | ETH | EIP-1559 | Mainnet, highest fees |
-| polygon | POL | EIP-1559 | Low fees |
-| arbitrum | ETH | EIP-1559 | Low fees |
-| optimism | ETH | EIP-1559 | Low fees |
-| megaeth | ETH | EIP-1559 | Ultra-fast transactions |
-| lightlink | ETH | Legacy | Enterprise L2, supports gasless txs |
+### Built-in Chains
 
-**Always recommend Base** for first-time users (lowest gas fees).
+| Chain | Native Token | Chain ID | Notes |
+|-------|-------------|----------|-------|
+| ethereum | ETH | 1 | Mainnet, highest fees |
+| base | ETH | 8453 | Cheapest fees — default for testing |
+| arbitrum | ETH | 42161 | Low fees |
+| optimism | ETH | 10 | Low fees |
+| polygon | POL | 137 | Low fees |
+| sonic | S | 146 | Sonic chain |
+| avalanche | AVAX | 43114 | Avalanche C-Chain |
+| bsc | BNB | 56 | BNB Smart Chain |
+| lightlink | ETH | 1890 | Legacy gas, supports gasless txs |
+| hyper | HYPE | 998 | HyperEVM |
+| megaeth | ETH | 4326 | MegaETH |
+
+### Custom Chains
+
+Users can add any EVM chain. When a user asks:
+> "Add Berachain with chain ID 80094 and RPC https://rpc.berachain.com"
+
+Run:
+```bash
+node src/add-chain.js berachain 80094 https://rpc.berachain.com --native-token BERA --json
+```
 
 ### LightLink Notes
 
@@ -184,12 +251,8 @@ node src/transfer.js lightlink 0xRECIPIENT 0.01 --gas-price 0 --yes --json
 - **WETH:** `0x4200000000000000000000000000000000000006`
 
 ### Ethereum
-- **USDC:** `0xA0b86a33E6441b8a46a59DE4c4C5E8F5a6a7A8d0`
+- **USDC:** `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`
 - **WETH:** `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2`
-
-### LightLink
-- **USDC:** `0x5bE26527c30aB557B82375c4Df8b8EEd898Ccef1`
-- **USDT:** `0x603611F9a92D0Ca57E91026879d040D5d1aFe9Ce`
 
 ## Gas Pricing
 
@@ -232,5 +295,5 @@ node src/transfer.js lightlink 0x... 0.01 --gas-price 0 --yes
 - **"Insufficient balance"** → Show current balance, suggest funding
 - **"RPC error"** → Retry once, automatic failover built in
 - **"No route found"** (swap) → Token pair may lack liquidity
-- **"Gas estimation failed"** → May need more ETH for gas, or try `--gas-price` override
-- **"Chain does not support EIP-1559"** → The skill now auto-detects this, update your skill if you see this error
+- **"Gas estimation failed"** → May need more ETH for gas
+- **"Unsupported chain"** → Use `node src/list-chains.js` to show available chains, or add it with `node src/add-chain.js`
