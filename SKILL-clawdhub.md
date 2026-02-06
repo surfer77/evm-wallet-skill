@@ -1,6 +1,6 @@
 ---
 name: evm-wallet-skill
-description: Self-sovereign EVM wallet for AI agents. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, or interact with smart contracts. Supports Base, Ethereum, Polygon, Arbitrum, and Optimism. Private keys stored locally — no cloud custody, no API keys required.
+description: Self-sovereign EVM wallet for AI agents with Venice AI integration. Use when the user wants to create a crypto wallet, check balances, send ETH or ERC20 tokens, swap tokens, interact with smart contracts, or access Venice's private AI inference API with DIEM tokens. Supports Base, Ethereum, Polygon, Arbitrum, and Optimism. Private keys stored locally — no cloud custody.
 metadata: {"clawdbot":{"emoji":"💰","homepage":"https://github.com/surfer77/evm-wallet-skill","requires":{"bins":["node","git"]}}}
 ---
 
@@ -191,3 +191,100 @@ cd "$SKILL_DIR" && git pull && npm install
 - **"RPC error"** → Retry once, automatic failover built in
 - **"No route found"** (swap) → Token pair may lack liquidity
 - **"Gas estimation failed"** → May need more ETH for gas
+
+---
+
+## Venice AI Integration
+
+Access Venice's private, uncensored AI inference API. Pay with DIEM tokens on Base for crypto-native AI access.
+
+### What is Venice?
+
+[Venice](https://venice.ai) provides private AI inference — your prompts are never logged or used for training. Models include uncensored text generation, image generation, and more.
+
+### What is DIEM?
+
+DIEM is Venice's compute token on Base. **1 staked DIEM = $1/day of AI inference.**
+
+- **DIEM Token (Base):** `0xf4d97f2da56e8c3098f3a8d538db630a2606a024`
+- Get DIEM by staking VVV at [venice.ai/staking](https://venice.ai/staking)
+- Staked DIEM automatically enables API access — no credit card needed
+
+### Setup Venice API
+
+1. Get an API key at [venice.ai/settings/api](https://venice.ai/settings/api)
+2. Save it:
+
+```bash
+node src/venice.js setup <your_api_key> --json
+```
+
+Returns: `{ "success": true, "configPath": "~/.venice-api.json" }`
+
+### Check DIEM Balance & Allocation
+
+```bash
+# Check Venice account balance (DIEM allocation, usage)
+node src/venice.js balance --json
+
+# Check on-chain DIEM token balance
+node src/balance.js base 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 --json
+```
+
+### List Available Models
+
+```bash
+# Text models
+node src/venice.js models text --json
+
+# Image models
+node src/venice.js models image --json
+```
+
+### Chat Completion (Text Generation)
+
+```bash
+node src/venice.js chat "Explain quantum computing" --model llama-3.3-70b --json
+```
+
+Recommended models:
+- **Private (your data never leaves Venice):** `llama-3.3-70b`, `deepseek-v3.2`, `venice-uncensored`
+- **Anonymized (routed through partners):** `claude-opus-45`, `gpt-5.2`, `grok-41-fast`
+
+### Image Generation
+
+```bash
+node src/venice.js generate "A cyberpunk cat in neon Tokyo" --model flux-2-pro --json
+```
+
+### Paying with Crypto (DIEM Flow)
+
+To pay for Venice inference with crypto instead of a credit card:
+
+1. **Get VVV tokens** on Base (swap ETH → VVV using this skill's swap command)
+2. **Stake VVV for DIEM** at [venice.ai/staking](https://venice.ai/staking)
+3. **Staked DIEM enables API access** — Venice automatically uses your DIEM allocation
+
+Check your staking status:
+```bash
+# Check staked DIEM balance (on-chain)
+node src/contract.js base \
+  0xf4d97f2da56e8c3098f3a8d538db630a2606a024 \
+  "stakedInfos(address)" 0xYOUR_WALLET --json
+
+# Check Venice API allocation
+node src/venice.js balance --json
+```
+
+### Venice Token Addresses (Base)
+
+| Token | Address | Description |
+|-------|---------|-------------|
+| DIEM | `0xf4d97f2da56e8c3098f3a8d538db630a2606a024` | Compute token (stake for API access) |
+
+### Why Venice + Crypto?
+
+- **Privacy**: Your prompts are private, never logged
+- **Uncensored**: Access models without content restrictions
+- **Permissionless**: Pay with crypto, no KYC required
+- **Self-sovereign**: Your wallet + your AI — no platform lock-in
