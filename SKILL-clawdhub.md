@@ -285,7 +285,7 @@ Then skip to **Step 4: Use Venice API** below.
 
 #### Option B: Stake VVV for DIEM (Governance Route)
 
-This route gives you VVV governance rights. VVV stakers receive DIEM emissions.
+VVV stakers receive DIEM emissions over time.
 
 #### Step 1: Get VVV tokens on Base
 

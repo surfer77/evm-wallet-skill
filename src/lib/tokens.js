@@ -15,7 +15,7 @@ export const tokens = {
     
     // Venice Ecosystem
     DIEM: '0xf4d97f2da56e8c3098f3a8d538db630a2606a024',  // Compute token (stake for API access)
-    VVV: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf',   // Governance token (stake to get DIEM)
+    VVV: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf',   // Venice token (stake to get DIEM)
   },
   
   ethereum: {
@@ -155,7 +155,7 @@ export const venice = {
       '1 staked DIEM = $1/day of AI inference',
       'Unstaking DIEM has a 1-day cooldown',
       'Get API key at venice.ai/settings/api',
-      'Direct DIEM purchase is simplest; VVV staking gives governance rights',
+      'Direct DIEM purchase is simplest; VVV staking is an alternative route to get DIEM',
     ],
   },
 };
