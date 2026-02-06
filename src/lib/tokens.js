@@ -133,20 +133,29 @@ export const venice = {
   
   // How to get DIEM and use for AI inference
   workflow: {
-    steps: [
-      '1. Get ETH on Base (bridge from mainnet or buy on exchange)',
-      '2. Swap ETH → VVV using: node src/swap.js base eth 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf <amount>',
-      '3. Approve VVV for staking: node src/contract.js base 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf "approve(address,uint256)" 0x321b7ff75154472B18EDb199033fF4D116F340Ff <amount> --yes',
-      '4. Stake VVV to get DIEM: node src/contract.js base 0x321b7ff75154472B18EDb199033fF4D116F340Ff "stake(uint256)" <amount> --yes',
-      '5. Stake DIEM for API access: node src/contract.js base 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 "stake(uint256)" <amount> --yes',
-      '6. Setup Venice API: node src/venice.js setup <api_key>',
+    // Option A: Buy DIEM directly (simplest)
+    directBuy: [
+      '1. Get ETH on Base',
+      '2. Swap ETH → DIEM: node src/swap.js base eth 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 <amount> --yes',
+      '3. Stake DIEM: node src/contract.js base 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 "stake(uint256)" <amount> --yes',
+      '4. Setup API: node src/venice.js setup <api_key>',
+      '5. Use AI: node src/venice.js chat "Hello world"',
+    ],
+    // Option B: Stake VVV for DIEM (governance route)
+    vvvStaking: [
+      '1. Get ETH on Base',
+      '2. Swap ETH → VVV: node src/swap.js base eth 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf <amount> --yes',
+      '3. Approve VVV: node src/contract.js base 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf "approve(address,uint256)" 0x321b7ff75154472B18EDb199033fF4D116F340Ff <amount> --yes',
+      '4. Stake VVV: node src/contract.js base 0x321b7ff75154472B18EDb199033fF4D116F340Ff "stake(uint256)" <amount> --yes',
+      '5. Stake DIEM: node src/contract.js base 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 "stake(uint256)" <amount> --yes',
+      '6. Setup API: node src/venice.js setup <api_key>',
       '7. Use AI: node src/venice.js chat "Hello world"',
     ],
     notes: [
       '1 staked DIEM = $1/day of AI inference',
       'Unstaking DIEM has a 1-day cooldown',
       'Get API key at venice.ai/settings/api',
-      'Staking web UI available at venice.ai/staking',
+      'Direct DIEM purchase is simplest; VVV staking gives governance rights',
     ],
   },
 };

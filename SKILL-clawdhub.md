@@ -259,7 +259,33 @@ node src/venice.js generate "A cyberpunk cat in neon Tokyo" --model flux-2-pro -
 
 ### Paying with Crypto (DIEM Flow)
 
-Complete workflow to pay for Venice AI with crypto:
+Two ways to get DIEM for Venice AI access:
+
+---
+
+#### Option A: Buy DIEM Directly (Simplest)
+
+```bash
+# Swap ETH → DIEM directly
+node src/swap.js base eth 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 0.1 --quote-only --json
+
+# Execute swap (after user confirms)
+node src/swap.js base eth 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 0.1 --yes --json
+
+# Stake DIEM for API access
+node src/contract.js base \
+  0xf4d97f2da56e8c3098f3a8d538db630a2606a024 \
+  "stake(uint256)" \
+  1000000000000000000 --yes --json
+```
+
+Then skip to **Step 4: Use Venice API** below.
+
+---
+
+#### Option B: Stake VVV for DIEM (Governance Route)
+
+This route gives you VVV governance rights. VVV stakers receive DIEM emissions.
 
 #### Step 1: Get VVV tokens on Base
 
