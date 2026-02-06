@@ -285,7 +285,7 @@ Then skip to **Step 4: Use Venice API** below.
 
 #### Option B: Stake VVV for DIEM (Governance Route)
 
-VVV stakers receive DIEM emissions over time.
+Staked VVV lets you mint DIEM (vs buying it). VVV stakers also earn VVV emissions.
 
 #### Step 1: Get VVV tokens on Base
 
