@@ -14,8 +14,8 @@ export const tokens = {
     WETH: '0x4200000000000000000000000000000000000006',
     
     // Venice Ecosystem
-    DIEM: '0xf4d97f2da56e8c3098f3a8d538db630a2606a024',
-    VVV: '0x5b2d8b2e2a8d7e8d3f0b8c6b5b3d1c0e4e3f2d1a', // Venice VVV token (stake for DIEM)
+    DIEM: '0xf4d97f2da56e8c3098f3a8d538db630a2606a024',  // Compute token (stake for API access)
+    VVV: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf',   // Governance token (stake to get DIEM)
   },
   
   ethereum: {
@@ -91,13 +91,65 @@ export function getTokenSymbol(chainName, address) {
 }
 
 /**
- * Venice ecosystem token info
+ * Venice ecosystem token and contract info
  */
-export const veniceTokens = {
-  DIEM: {
-    address: '0xf4d97f2da56e8c3098f3a8d538db630a2606a024',
-    chain: 'base',
-    decimals: 18,
-    description: 'Venice DIEM token - stake for AI compute. 1 staked DIEM = $1/day of inference.',
+export const venice = {
+  chain: 'base',
+  
+  tokens: {
+    VVV: {
+      address: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf',
+      decimals: 18,
+      description: 'Venice governance token. Stake VVV to receive DIEM.',
+    },
+    DIEM: {
+      address: '0xf4d97f2da56e8c3098f3a8d538db630a2606a024',
+      decimals: 18,
+      description: 'Venice compute token. 1 staked DIEM = $1/day of AI inference.',
+    },
+  },
+  
+  contracts: {
+    staking: {
+      address: '0x321b7ff75154472B18EDb199033fF4D116F340Ff',
+      description: 'VVV Staking contract - stake VVV to receive DIEM',
+      // Key functions:
+      // - stake(uint256 amount): Stake VVV tokens
+      // - unstake(uint256 amount): Begin unstaking (starts cooldown)
+      // - withdraw(): Withdraw after cooldown
+      // - stakedBalance(address): Check staked VVV balance
+    },
+    diem: {
+      address: '0xf4d97f2da56e8c3098f3a8d538db630a2606a024',
+      description: 'DIEM token with staking - stake DIEM for API access',
+      // Key functions:
+      // - stake(uint256 amount): Stake DIEM for API access
+      // - initiateUnstake(uint256 amount): Begin unstaking (1 day cooldown)
+      // - unstake(): Complete unstake after cooldown
+      // - stakedInfos(address): Returns (amountStaked, coolDownEnd, coolDownAmount)
+      // - balanceOf(address): Check DIEM balance
+    },
+  },
+  
+  // How to get DIEM and use for AI inference
+  workflow: {
+    steps: [
+      '1. Get ETH on Base (bridge from mainnet or buy on exchange)',
+      '2. Swap ETH → VVV using: node src/swap.js base eth 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf <amount>',
+      '3. Approve VVV for staking: node src/contract.js base 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf "approve(address,uint256)" 0x321b7ff75154472B18EDb199033fF4D116F340Ff <amount> --yes',
+      '4. Stake VVV to get DIEM: node src/contract.js base 0x321b7ff75154472B18EDb199033fF4D116F340Ff "stake(uint256)" <amount> --yes',
+      '5. Stake DIEM for API access: node src/contract.js base 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 "stake(uint256)" <amount> --yes',
+      '6. Setup Venice API: node src/venice.js setup <api_key>',
+      '7. Use AI: node src/venice.js chat "Hello world"',
+    ],
+    notes: [
+      '1 staked DIEM = $1/day of AI inference',
+      'Unstaking DIEM has a 1-day cooldown',
+      'Get API key at venice.ai/settings/api',
+      'Staking web UI available at venice.ai/staking',
+    ],
   },
 };
+
+// Legacy export for backwards compatibility
+export const veniceTokens = venice.tokens;

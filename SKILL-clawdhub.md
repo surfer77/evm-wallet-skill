@@ -248,7 +248,7 @@ node src/venice.js chat "Explain quantum computing" --model llama-3.3-70b --json
 ```
 
 Recommended models:
-- **Private (your data never leaves Venice):** `llama-3.3-70b`, `deepseek-v3.2`, `venice-uncensored`
+- **Private (your data never leaves Venice):** `zai-org-glm-4.7` (default), `deepseek-v3.2`, `llama-3.3-70b`, `venice-uncensored`
 - **Anonymized (routed through partners):** `claude-opus-45`, `gpt-5.2`, `grok-41-fast`
 
 ### Image Generation
@@ -259,15 +259,71 @@ node src/venice.js generate "A cyberpunk cat in neon Tokyo" --model flux-2-pro -
 
 ### Paying with Crypto (DIEM Flow)
 
-To pay for Venice inference with crypto instead of a credit card:
+Complete workflow to pay for Venice AI with crypto:
 
-1. **Get VVV tokens** on Base (swap ETH → VVV using this skill's swap command)
-2. **Stake VVV for DIEM** at [venice.ai/staking](https://venice.ai/staking)
-3. **Staked DIEM enables API access** — Venice automatically uses your DIEM allocation
+#### Step 1: Get VVV tokens on Base
 
-Check your staking status:
 ```bash
-# Check staked DIEM balance (on-chain)
+# Check ETH balance
+node src/balance.js base --json
+
+# Swap ETH → VVV (get quote first)
+node src/swap.js base eth 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf 0.1 --quote-only --json
+
+# Execute swap (after user confirms)
+node src/swap.js base eth 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf 0.1 --yes --json
+```
+
+#### Step 2: Stake VVV to get DIEM
+
+```bash
+# Check VVV balance
+node src/balance.js base 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf --json
+
+# Approve VVV for staking contract
+node src/contract.js base \
+  0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf \
+  "approve(address,uint256)" \
+  0x321b7ff75154472B18EDb199033fF4D116F340Ff \
+  1000000000000000000 --yes --json
+
+# Stake VVV (receives DIEM in return)
+node src/contract.js base \
+  0x321b7ff75154472B18EDb199033fF4D116F340Ff \
+  "stake(uint256)" \
+  1000000000000000000 --yes --json
+```
+
+#### Step 3: Stake DIEM for API access
+
+```bash
+# Check DIEM balance
+node src/balance.js base 0xf4d97f2da56e8c3098f3a8d538db630a2606a024 --json
+
+# Stake DIEM (enables API access)
+node src/contract.js base \
+  0xf4d97f2da56e8c3098f3a8d538db630a2606a024 \
+  "stake(uint256)" \
+  1000000000000000000 --yes --json
+```
+
+#### Step 4: Use Venice API
+
+```bash
+# Setup API key (get at venice.ai/settings/api)
+node src/venice.js setup <api_key> --json
+
+# Check allocation
+node src/venice.js balance --json
+
+# Start using AI!
+node src/venice.js chat "Hello world" --json
+```
+
+#### Check Staking Status
+
+```bash
+# Check staked DIEM (returns: amountStaked, coolDownEnd, coolDownAmount)
 node src/contract.js base \
   0xf4d97f2da56e8c3098f3a8d538db630a2606a024 \
   "stakedInfos(address)" 0xYOUR_WALLET --json
@@ -276,11 +332,27 @@ node src/contract.js base \
 node src/venice.js balance --json
 ```
 
-### Venice Token Addresses (Base)
+#### Unstaking DIEM
 
-| Token | Address | Description |
-|-------|---------|-------------|
+```bash
+# Initiate unstake (starts 1-day cooldown)
+node src/contract.js base \
+  0xf4d97f2da56e8c3098f3a8d538db630a2606a024 \
+  "initiateUnstake(uint256)" <amount> --yes --json
+
+# Complete unstake (after cooldown)
+node src/contract.js base \
+  0xf4d97f2da56e8c3098f3a8d538db630a2606a024 \
+  "unstake()" --yes --json
+```
+
+### Venice Contracts & Tokens (Base)
+
+| Name | Address | Description |
+|------|---------|-------------|
+| VVV | `0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf` | Governance token (stake to get DIEM) |
 | DIEM | `0xf4d97f2da56e8c3098f3a8d538db630a2606a024` | Compute token (stake for API access) |
+| VVV Staking | `0x321b7ff75154472B18EDb199033fF4D116F340Ff` | Stake VVV → receive DIEM |
 
 ### Why Venice + Crypto?
 

@@ -136,7 +136,7 @@ async function getBalance() {
 }
 
 async function chatCompletion(prompt, options = {}) {
-  const model = options.model || 'llama-3.3-70b';
+  const model = options.model || 'zai-org-glm-4.7'; // GLM 4.7 - Private, fast, good default
   const systemPrompt = options.system || null;
   
   const messages = [];
@@ -322,7 +322,7 @@ Payment with DIEM:
 Examples:
   node src/venice.js setup vn_abc123...
   node src/venice.js models
-  node src/venice.js chat "Explain quantum computing" --model llama-3.3-70b
+  node src/venice.js chat "Explain quantum computing" --model zai-org-glm-4.7
   node src/venice.js generate "A cyberpunk cat" --model flux-2-pro --json
 `);
         break;
