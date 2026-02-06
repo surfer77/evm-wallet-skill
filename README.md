@@ -1,8 +1,10 @@
 # 🔐 EVM Wallet Skill
 
-Self-sovereign crypto wallet for AI agents. Your keys, your wallet, no API dependencies.
+Self-sovereign crypto wallet for AI agents with Venice AI integration. Your keys, your wallet, pay for AI with crypto.
 
 Built for [Moltbot](https://github.com/BankrBot/moltbot-skills) / [Clawdbot](https://github.com/clawdbot/clawdbot).
+
+**New:** Pay for private AI inference via [Venice](https://venice.ai) using DIEM tokens on Base.
 
 ## ⚠️ SECURITY WARNING
 
@@ -49,6 +51,10 @@ node src/transfer.js base 0x... 0.01
 
 # Interact with any contract
 node src/contract.js base 0x... "balanceOf(address)" 0x...
+
+# Venice AI: Setup and chat
+node src/venice.js setup <api_key>
+node src/venice.js chat "Hello, world"
 ```
 
 ## Commands
@@ -63,6 +69,11 @@ node src/contract.js base 0x... "balanceOf(address)" 0x...
 | `node src/transfer.js <chain> <to> <amount> <token>` | Send ERC20 token |
 | `node src/swap.js <chain> <from> <to> <amount>` | Swap tokens via Odos aggregator |
 | `node src/contract.js <chain> <addr> <fn> [args...]` | Call any contract function |
+| `node src/venice.js setup <api_key>` | Configure Venice API key |
+| `node src/venice.js models [type]` | List Venice AI models |
+| `node src/venice.js balance` | Check DIEM balance & allocation |
+| `node src/venice.js chat <prompt>` | Chat with Venice AI |
+| `node src/venice.js generate <prompt>` | Generate images with Venice |
 
 All commands support `--json` for machine-readable output.
 
